@@ -39,6 +39,10 @@ if (!isset($_SESSION['user_id'])) {
     
     <div class="d-grid gap-2 col-4 mx-auto">
         <a href="view_books.php" class="btn btn-primary btn-lg">View All Books</a>
+            <a href="my_books.php" class="btn btn-primary btn-lg">My Borrowed Books</a>
+                <?php if ($_SESSION['role'] == 'admin') { ?>
+        <a href="add_book.php" class="btn btn-warning btn-lg">Add New Book (Admin)</a>
+    <?php } ?>
         <a href="generate_qr.php" class="btn btn-primary btn-lg">Generate QR Codes</a>
         <a href="scan_qr.php" class="btn btn-primary btn-lg">Scan QR to Issue Book</a>
         <a href="logout.php" class="btn btn-danger btn-lg">Logout</a>
