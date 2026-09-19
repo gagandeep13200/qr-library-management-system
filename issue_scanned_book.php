@@ -1,4 +1,8 @@
 <?php
+session_start();
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
+    die("Unauthorized access.");
+}
 include 'db_connect.php';
 
 $book_id = $_GET['book_id'];
