@@ -15,7 +15,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];
     $password = $_POST['password'];
 
-    $check = $conn->query("SELECT * FROM users WHERE erp_id = '$erp_id' OR email = '$email'");
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $erp_id = $_POST['erp_id'];
+    $name = $_POST['name'];
+    $email = $_POST['email'];
+    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+
+    $stmt = $conn->prepare("SELECT * FROM users WHERE erp_id = ? OR email = ?");
+    $stmt->bind_param("ss", $erp_id, $email);
+    $stmt->execute();
+    $check = $stmt->get_result();
+
+    if ($check->num_rows > 0) {
+        $error = "ERP ID or Email already exists.";
+    } else {
+        $stmt2 = $conn->prepare("INSERT INTO users (erp_id, name, email, password, role) VALUES (?, ?, ?, ?, 'student')");
+        $stmt2->bind_param("ssss", $erp_id, $name, $email, $password);
+        if ($stmt2->execute()) {
+            $success = "Student added successfully!";
+        } else {
+            $error = "Error: " . $conn->error;
+        }
+    }
+}
 
     if ($check->num_rows > 0) {
         $error = "ERP ID or Email already exists.";
