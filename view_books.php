@@ -7,88 +7,75 @@ if (!isset($_SESSION['user_id'])) {
 include 'db_connect.php';
 $role = $_SESSION['role'];
 
-// Fetch books with issued count for availability
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $sql = "SELECT b.*, 
         (SELECT COUNT(*) FROM borrow_records br WHERE br.book_id = b.book_id AND br.status='issued') as issued_count
-        FROM books b ORDER BY b.title ASC";
-$books = $conn->query($sql);
+        FROM books b WHERE 1=1";
+$params = [];
+$types = "";
+if ($search != '') {
+    $sql .= " AND (title LIKE ? OR author LIKE ?)";
+    $like = "%$search%";
+    $params[] = $like; $params[] = $like;
+    $types .= "ss";
+}
+$sql .= " ORDER BY title";
+$stmt = $conn->prepare($sql);
+if (count($params) > 0) { $stmt->bind_param($types, ...$params); }
+$stmt->execute();
+$result = $stmt->get_result();
 ?>
 <!DOCTYPE html>
 <html>
 <head>
-    <title>View Books</title>
+    <title>Books - Library System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <style>
-        body { background: #f4f6f9; padding: 30px; }
-        .card { border-radius: 12px; }
-    </style>
 </head>
 <body>
-<?php include 'toast.php'; ?>
+<div class="container mt-5">
+    <h2 class="mb-4">📚 Books in Library</h2>
+    <a href="index.php" class="btn btn-secondary mb-3">← Back to Home</a>
 
-<div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>📚 All Books</h3>
-        <a href="index.php" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
-    </div>
+    <form method="GET" class="mb-3">
+        <input type="text" name="search" class="form-control" placeholder="Search by title or author..." value="<?php echo htmlspecialchars($search); ?>">
+    </form>
 
-    <div class="mb-3">
-        <input type="text" id="searchBox" class="form-control" placeholder="🔍 Search by title or author...">
-    </div>
-
-    <div class="card p-3">
-        <table class="table table-hover align-middle" id="booksTable">
-            <thead>
-                <tr>
-                    <th>Title</th>
-                    <th>Author</th>
-                    <th>Total Copies</th>
-                    <th>Available</th>
-                    <th>Status</th>
-                    <?php if ($role == 'admin') { ?><th>Actions</th><?php } ?>
-                </tr>
-            </thead>
-            <tbody>
-                <?php while ($row = $books->fetch_assoc()) {
-                    $available = $row['quantity'] - $row['issued_count'];
-                ?>
-                <tr>
-                    <td><?php echo htmlspecialchars($row['title']); ?></td>
-                    <td><?php echo htmlspecialchars($row['author']); ?></td>
-                    <td><?php echo $row['quantity']; ?></td>
-                    <td><?php echo $available; ?></td>
-                    <td>
-                        <?php if ($available > 0) { ?>
-                            <span class="badge bg-success">Available</span>
-                        <?php } else { ?>
-                            <span class="badge bg-danger">Out of Stock</span>
-                        <?php } ?>
-                    </td>
-                    <?php if ($role == 'admin') { ?>
-                    <td>
-                        <a href="edit_book.php?id=<?php echo $row['book_id']; ?>" class="btn btn-sm btn-primary"><i class="bi bi-pencil"></i></a>
-                        <a href="delete_book.php?id=<?php echo $row['book_id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this book? This cannot be undone.');"><i class="bi bi-trash"></i></a>
-                    </td>
+    <table class="table table-striped table-bordered">
+        <thead class="table-dark">
+            <tr>
+                <th>Title</th><th>Author</th><th>Category</th><th>Course/Branch</th><th>ISBN</th><th>Total</th><th>Available</th>
+                <?php if ($role == 'admin') echo "<th>Actions</th>"; ?>
+            </tr>
+        </thead>
+        <tbody>
+            <?php while ($row = $result->fetch_assoc()) { 
+                $available = $row['quantity'] - $row['issued_count'];
+            ?>
+            <tr>
+                <td><?php echo htmlspecialchars($row['title']); ?></td>
+                <td><?php echo htmlspecialchars($row['author']); ?></td>
+                <td><?php echo htmlspecialchars($row['category']); ?></td>
+                <td><?php echo htmlspecialchars($row['course'] . " " . $row['branch']); ?></td>
+                <td><?php echo htmlspecialchars($row['isbn']); ?></td>
+                <td><?php echo $row['quantity']; ?></td>
+                <td>
+                    <?php if ($available > 0) { ?>
+                        <span class="badge bg-success"><?php echo $available; ?></span>
+                    <?php } else { ?>
+                        <span class="badge bg-danger">0</span>
                     <?php } ?>
-                </tr>
+                </td>
+                <?php if ($role == 'admin') { ?>
+                <td>
+                    <a href="edit_book.php?id=<?php echo $row['book_id']; ?>" class="btn btn-sm btn-primary">Edit</a>
+                    <a href="delete_book.php?id=<?php echo $row['book_id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this book?');">Delete</a>
+                </td>
                 <?php } ?>
-            </tbody>
-        </table>
-    </div>
+            </tr>
+            <?php } ?>
+        </tbody>
+    </table>
 </div>
-
-<script>
-document.getElementById('searchBox').addEventListener('keyup', function() {
-    const query = this.value.toLowerCase();
-    const rows = document.querySelectorAll('#booksTable tbody tr');
-    rows.forEach(row => {
-        const title = row.cells[0].textContent.toLowerCase();
-        const author = row.cells[1].textContent.toLowerCase();
-        row.style.display = (title.includes(query) || author.includes(query)) ? '' : 'none';
-    });
-});
-</script>
 </body>
 </html>
 <?php $conn->close(); ?>
