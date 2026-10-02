@@ -11,10 +11,11 @@ $id = intval($_GET['id'] ?? 0);
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $title = trim($_POST['title']);
     $author = trim($_POST['author']);
-    $quantity = intval($_POST['quantity']);
+    $category = trim($_POST['category']);
+    $isbn = trim($_POST['isbn']);
 
-    $stmt = $conn->prepare("UPDATE books SET title=?, author=?, quantity=? WHERE book_id=?");
-    $stmt->bind_param("ssii", $title, $author, $quantity, $id);
+    $stmt = $conn->prepare("UPDATE books SET title=?, author=?, category=?, isbn=? WHERE book_id=?");
+    $stmt->bind_param("ssssi", $title, $author, $category, $isbn, $id);
     $stmt->execute();
     $stmt->close();
 
@@ -29,7 +30,7 @@ $book = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$book) {
-    header("Location: view_books.php?msg=Book not found");
+    header("Location: view_books.php?msg=" . urlencode("Book not found"));
     exit();
 }
 ?>
@@ -52,9 +53,15 @@ if (!$book) {
             <input type="text" name="author" class="form-control" value="<?php echo htmlspecialchars($book['author']); ?>" required>
         </div>
         <div class="mb-3">
-            <label class="form-label">Quantity</label>
-            <input type="number" name="quantity" min="0" class="form-control" value="<?php echo $book['quantity']; ?>" required>
+            <label class="form-label">Category</label>
+            <input type="text" name="category" class="form-control" value="<?php echo htmlspecialchars($book['category']); ?>">
         </div>
+        <div class="mb-3">
+            <label class="form-label">ISBN</label>
+            <input type="text" name="isbn" class="form-control" value="<?php echo htmlspecialchars($book['isbn']); ?>">
+        </div>
+        <p class="text-muted small">Book Code: <strong><?php echo htmlspecialchars($book['book_code']); ?></strong> (QR prefix hai, isliye edit nahi kar sakte)</p>
+        <p class="text-muted small">Copies add karni ho to "Add Book" se naya entry na banao — yeh feature abhi available nahi hai, future improvement ke roop mein add kar sakte hain.</p>
         <button type="submit" class="btn btn-success">Save Changes</button>
         <a href="view_books.php" class="btn btn-secondary">Cancel</a>
     </form>

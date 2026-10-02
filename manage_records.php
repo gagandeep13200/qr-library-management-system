@@ -14,7 +14,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['return_id'])) {
         $conn->begin_transaction();
 
         // Only records that are still issued can be returned
-        $sel = $conn->prepare("SELECT copy_id FROM borrow_records WHERE record_id=? AND status='issued' FOR UPDATE");
+        $sel = $conn->prepare("SELECT copy_id, due_date FROM borrow_records WHERE record_id=? AND status='issued' FOR UPDATE");
         $sel->bind_param("i", $record_id);
         $sel->execute();
         $rec = $sel->get_result()->fetch_assoc();
@@ -34,6 +34,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['return_id'])) {
         }
 
         $conn->commit();
+        // Late hai to seedha payment (QR) wale page par bhejo
+if ($return_date > $rec['due_date']) {
+    header("Location: overdue_list.php?pay=" . $record_id
+         . "&msg=" . urlencode("Book return ho gayi. Late hai, fine collect karo.")
+         . "&t=warning");
+    exit();
+}
         $_SESSION['flash'] = ["success", "Book return ho gayi."];
     } catch (Throwable $e) {
         $conn->rollback();

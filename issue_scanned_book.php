@@ -1,5 +1,8 @@
 <?php
 session_start();
+// Plain text response: scan_qr.php ise innerText se dikhata hai, isliye HTML-escaping ki zarurat nahi
+header('Content-Type: text/plain; charset=utf-8');
+
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     die("Unauthorized access.");
 }
@@ -73,10 +76,10 @@ try {
     $stmt->close();
 
     $conn->commit();
-    echo "✅ '" . htmlspecialchars($copy['title']) . "' (Copy: " . htmlspecialchars($copy_id) . ") issued to " . htmlspecialchars($student['name']) . ". Issue: " . htmlspecialchars($issue_date) . " | Due: " . htmlspecialchars($due_date);
+    echo "✅ '" . $copy['title'] . "' (Copy: " . $copy_id . ") issued to " . $student['name'] . ". Issue: " . $issue_date . " | Due: " . $due_date;
 } catch (Throwable $e) {
     $conn->rollback();
-    echo "❌ Error: " . htmlspecialchars($e->getMessage());
+    echo "❌ Error: " . $e->getMessage();
 }
 
 $conn->close();
