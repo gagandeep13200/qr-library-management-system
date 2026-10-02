@@ -5,9 +5,11 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     exit();
 }
 include 'db_connect.php';
+include 'csrf.php';
 
 // ---- Return handling (POST only) ----
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['return_id'])) {
+    csrf_verify();
     $record_id   = (int)$_POST['return_id'];
     $return_date = date("Y-m-d");
     try {
@@ -35,12 +37,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['return_id'])) {
 
         $conn->commit();
         // Late hai to seedha payment (QR) wale page par bhejo
-if ($return_date > $rec['due_date']) {
-    header("Location: overdue_list.php?pay=" . $record_id
-         . "&msg=" . urlencode("Book return ho gayi. Late hai, fine collect karo.")
-         . "&t=warning");
-    exit();
-}
+        if ($return_date > $rec['due_date']) {
+            header("Location: overdue_list.php?pay=" . $record_id
+                 . "&msg=" . urlencode("Book return ho gayi. Late hai, fine collect karo.")
+                 . "&t=warning");
+            exit();
+        }
         $_SESSION['flash'] = ["success", "Book return ho gayi."];
     } catch (Throwable $e) {
         $conn->rollback();
@@ -53,11 +55,30 @@ if ($return_date > $rec['due_date']) {
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
+// ---- Filter: by default sirf "active" records (issued ya recently returned) ----
+// show=all se poori history dikh jaati hai, lekin paginated.
+$show_all = (isset($_GET['show']) && $_GET['show'] === 'all');
+
+$per_page = 50;
+$page     = max(1, (int)($_GET['page'] ?? 1));
+$offset   = ($page - 1) * $per_page;
+
+$where = $show_all ? "" : "WHERE br.status = 'issued'";
+
+// Total count (pagination ke liye)
+$count_sql = "SELECT COUNT(*) AS c FROM borrow_records br $where";
+$total_records = (int)$conn->query($count_sql)->fetch_assoc()['c'];
+$total_pages = max(1, (int)ceil($total_records / $per_page));
+$page = min($page, $total_pages);
+$offset = ($page - 1) * $per_page;
+
 $sql = "SELECT br.record_id, br.copy_id, u.name, u.erp_id, b.title, br.borrow_date, br.due_date, br.status
         FROM borrow_records br
         JOIN users u ON br.user_id = u.user_id
         JOIN books b ON br.book_id = b.book_id
-        ORDER BY br.borrow_date DESC";
+        $where
+        ORDER BY br.borrow_date DESC
+        LIMIT $per_page OFFSET $offset";
 $result = $conn->query($sql);
 $today = date("Y-m-d");
 ?>
@@ -71,6 +92,16 @@ $today = date("Y-m-d");
 <div class="container mt-5">
     <h2 class="mb-4">📋 Manage All Borrowing Records</h2>
     <a href="index.php" class="btn btn-secondary mb-3">← Back to Home</a>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="text-muted"><?php echo $total_records; ?> record(s) <?php echo $show_all ? '(saare)' : '(sirf issued)'; ?></span>
+        <?php if ($show_all) { ?>
+            <a href="manage_records.php" class="btn btn-sm btn-outline-secondary">Sirf Issued dikhao</a>
+        <?php } else { ?>
+            <a href="manage_records.php?show=all" class="btn btn-sm btn-outline-secondary">Poori history dikhao</a>
+        <?php } ?>
+    </div>
+
     <?php if ($flash) { ?>
         <div class="alert alert-<?php echo $flash[0]; ?>"><?php echo htmlspecialchars($flash[1]); ?></div>
     <?php } ?>
@@ -81,7 +112,9 @@ $today = date("Y-m-d");
             </tr>
         </thead>
         <tbody>
-            <?php while ($row = $result->fetch_assoc()) {
+            <?php if ($total_records == 0) { ?>
+            <tr><td colspan="8" class="text-center text-muted py-4">Koi record nahi mila.</td></tr>
+            <?php } else { while ($row = $result->fetch_assoc()) {
                 $is_issued  = ($row['status'] == 'issued');
                 $is_overdue = ($is_issued && $row['due_date'] < $today);
             ?>
@@ -104,6 +137,7 @@ $today = date("Y-m-d");
                 <td>
                     <?php if ($is_issued) { ?>
                         <form method="POST" class="d-inline" onsubmit="return confirm('Is book ko returned mark karna hai?');">
+                            <?php echo csrf_field(); ?>
                             <input type="hidden" name="return_id" value="<?php echo (int)$row['record_id']; ?>">
                             <button type="submit" class="btn btn-sm btn-danger">Mark Returned</button>
                         </form>
@@ -112,9 +146,21 @@ $today = date("Y-m-d");
                     <?php } ?>
                 </td>
             </tr>
-            <?php } ?>
+            <?php } } ?>
         </tbody>
     </table>
+
+    <?php if ($total_pages > 1) { ?>
+    <nav>
+        <ul class="pagination justify-content-center">
+            <?php for ($p = 1; $p <= $total_pages; $p++) { ?>
+                <li class="page-item <?php echo $p == $page ? 'active' : ''; ?>">
+                    <a class="page-link" href="?page=<?php echo $p; ?><?php echo $show_all ? '&show=all' : ''; ?>"><?php echo $p; ?></a>
+                </li>
+            <?php } ?>
+        </ul>
+    </nav>
+    <?php } ?>
 </div>
 </body>
 </html>
