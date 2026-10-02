@@ -9,9 +9,7 @@ include_once 'library_config.php';
 
 $user_id = $_SESSION['user_id'];
 
-// Return ab sirf admin side se hota hai (manage_records.php).
-// Student side se return disable kar diya hai — isliye ye POST handler bhi band hai.
-/*
+// Return button (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['return_id'])) {
     $record_id = intval($_POST['return_id']);
     $return_date = date("Y-m-d");
@@ -61,9 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['return_id'])) {
     header("Location: my_books.php?msg=" . urlencode($msg));
     exit();
 }
-*/
 
 $stmt = $conn->prepare("SELECT br.record_id, b.title, br.borrow_date, br.due_date, br.return_date, br.status, br.fine_paid,
+                               (SELECT GROUP_CONCAT(fp4.id ORDER BY fp4.id) FROM fine_payments fp4 WHERE fp4.record_id = br.record_id) AS pay_ids,
                                (SELECT COALESCE(SUM(fp.amount), 0) FROM fine_payments fp WHERE fp.record_id = br.record_id) AS paid_sum,
                                (SELECT COUNT(*) FROM fine_payments fp2 WHERE fp2.record_id = br.record_id) AS pay_count
         FROM borrow_records br
@@ -163,15 +161,30 @@ $any_unpaid = false;
                             <?php if ($returned) { ?>
                                 <?php if ($outstanding <= 0) { ?>
                                     <span class="badge bg-success">Paid</span>
+                                    <?php foreach (array_filter(explode(',', (string)$row['pay_ids'])) as $rcpt_id) { ?>
+                                        <a href="fine_receipt.php?id=<?php echo (int)$rcpt_id; ?>" target="_blank" class="small">🧾 Receipt</a>
+                                    <?php } ?>
                                 <?php } elseif ($paid_so_far > 0) { ?>
                                     <span class="badge bg-warning text-dark">Balance ₹<?php echo $outstanding; ?></span>
+                                    <?php foreach (array_filter(explode(',', (string)$row['pay_ids'])) as $rcpt_id) { ?>
+                                        <a href="fine_receipt.php?id=<?php echo (int)$rcpt_id; ?>" target="_blank" class="small">🧾 Receipt</a>
+                                    <?php } ?>
                                 <?php } else { ?>
                                     <span class="badge bg-danger">Unpaid</span>
                                 <?php } ?>
                             <?php } ?>
                         <?php } ?>
                     </td>
-                    <td>—</td>
+                    <td>
+                        <?php if (!$returned) { ?>
+                            <form method="POST" class="d-inline" onsubmit="return confirm('Return this book?');">
+                                <input type="hidden" name="return_id" value="<?php echo $rid; ?>">
+                                <button type="submit" class="btn btn-sm btn-danger">Return</button>
+                            </form>
+                        <?php } else { ?>
+                            —
+                        <?php } ?>
+                    </td>
                 </tr>
                 <?php } } ?>
             </tbody>

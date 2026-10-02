@@ -11,8 +11,7 @@ $course_filter = isset($_GET['course']) ? trim($_GET['course']) : '';
 $branch_filter = isset($_GET['branch']) ? trim($_GET['branch']) : '';
 $year_filter   = isset($_GET['year'])   ? trim($_GET['year'])   : '';
 
-$sql = "SELECT name, erp_id, roll_number, course, branch, `year`, email
-        FROM users WHERE role='student'";
+$sql = "SELECT * FROM users WHERE role='student'";
 $params = [];
 $types  = "";
 
@@ -111,21 +110,25 @@ $years    = $conn->query("SELECT DISTINCT `year` FROM users WHERE role='student'
         <table class="table table-bordered table-striped">
             <thead class="table-dark">
                 <tr>
-                    <th>Name</th><th>ERP ID</th><th>Roll No.</th><th>Course</th><th>Branch</th><th>Year</th><th>Email</th>
+                    <th>Name</th><th>Father's Name</th><th>Mobile</th><th>ERP ID</th><th>Roll No.</th><th>Course</th><th>Branch</th><th>Year</th><th>Batch</th><th>Email</th><th>Action</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if ($total == 0) { ?>
-                <tr><td colspan="7" class="text-center text-muted py-4">No students found.</td></tr>
+                <tr><td colspan="11" class="text-center text-muted py-4">No students found.</td></tr>
                 <?php } else { while ($row = $result->fetch_assoc()) { ?>
                 <tr>
                     <td><?php echo htmlspecialchars($row['name']); ?></td>
+                    <td><?php echo htmlspecialchars($row['father_name'] ?? ''); ?></td>
+                    <td><?php echo htmlspecialchars($row['mobile_number'] ?? ''); ?></td>
                     <td><?php echo htmlspecialchars($row['erp_id']); ?></td>
                     <td><?php echo htmlspecialchars($row['roll_number']); ?></td>
                     <td><?php echo htmlspecialchars($row['course']); ?></td>
                     <td><?php echo htmlspecialchars($row['branch']); ?></td>
                     <td><?php echo htmlspecialchars($row['year']); ?></td>
+                    <td><?php echo htmlspecialchars($row['batch'] ?? ''); ?></td>
                     <td><?php echo htmlspecialchars($row['email']); ?></td>
+                    <td><a href="edit_student.php?id=<?php echo (int)$row['user_id']; ?>" class="btn btn-sm btn-primary">Edit</a></td>
                 </tr>
                 <?php } } ?>
             </tbody>

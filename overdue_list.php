@@ -88,6 +88,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payment'])) {
         }
 
         $conn->commit();
+        // Receipt seedha khol do (UTR unique hai, isliye usi se payment id mil jaati hai)
+        $stmt = $conn->prepare("SELECT id FROM fine_payments WHERE utr = ?");
+        $stmt->bind_param("s", $utr);
+        $stmt->execute();
+        $new_pay = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($new_pay) {
+            header("Location: fine_receipt.php?id=" . (int)$new_pay['id']);
+            exit();
+        }
         back_with("₹" . $amount . " payment record ho gaya (UTR " . $utr . ").", "success");
     } catch (mysqli_sql_exception $e) {
         $conn->rollback();
@@ -119,6 +129,7 @@ $resultA = $stmtA->get_result();
 
 // B) Late return ho chuki books -> yahin fine collect hota hai
 $stmtB = $conn->prepare("SELECT br.record_id, u.name, u.erp_id, u.course, u.branch, b.title, br.due_date, br.return_date, br.fine_paid,
+               (SELECT GROUP_CONCAT(fp4.id ORDER BY fp4.id) FROM fine_payments fp4 WHERE fp4.record_id = br.record_id) AS pay_ids,
                (SELECT COALESCE(SUM(fp.amount), 0) FROM fine_payments fp WHERE fp.record_id = br.record_id) AS paid_sum,
                (SELECT COUNT(*) FROM fine_payments fp2 WHERE fp2.record_id = br.record_id) AS pay_count
         FROM borrow_records br
@@ -250,9 +261,16 @@ $resultB = $stmtB->get_result();
                 <td>
                     <?php if ($outstanding <= 0) { ?>
                         <span class="badge bg-success">Paid ✓</span>
+                        <?php foreach (array_filter(explode(',', (string)$row['pay_ids'])) as $rcpt_id) { ?>
+                            <a href="fine_receipt.php?id=<?php echo (int)$rcpt_id; ?>" target="_blank" class="btn btn-sm btn-outline-secondary ms-1">🧾 Receipt #<?php echo (int)$rcpt_id; ?></a>
+                        <?php } ?>
                     <?php } else { ?>
                         <?php if ($paid_so_far > 0) { ?>
-                            <div class="small text-muted mb-1">Paid ₹<?php echo $paid_so_far; ?> · Balance ₹<?php echo $outstanding; ?></div>
+                            <div class="small text-muted mb-1">Paid ₹<?php echo $paid_so_far; ?> · Balance ₹<?php echo $outstanding; ?>
+                                <?php foreach (array_filter(explode(',', (string)$row['pay_ids'])) as $rcpt_id) { ?>
+                                    <a href="fine_receipt.php?id=<?php echo (int)$rcpt_id; ?>" target="_blank">🧾 #<?php echo (int)$rcpt_id; ?></a>
+                                <?php } ?>
+                            </div>
                         <?php } ?>
                         <button class="btn btn-sm btn-outline-primary" type="button"
                                 onclick="document.getElementById('pay-<?php echo $rid; ?>').classList.toggle('d-none')">
